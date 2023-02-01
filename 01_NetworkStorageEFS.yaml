@@ -1,0 +1,102 @@
+AWSTemplateFormatVersion: "2010-09-09"
+  # Description: Create an EFS file system and endpoints.
+
+Parameters:
+  VpcId:
+    Description: VPC ID that contains the subnets that will access the file system
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::VPC::Id>
+    Default: DefaultVpc
+  SubnetIds:
+    Description: Subnet IDs allowed to access the EFS file system
+    Type: AWS::SSM::Parameter::Value<List<AWS::EC2::Subnet::id>>
+    Default: SubnetIds
+
+Resources:
+  FileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      FileSystemTags:
+        - Key: Name
+          Value: 
+           Fn::Sub: "${AWS::StackName} EFS File System"
+      PerformanceMode: generalPurpose
+#Add some mount target resources so that they can connect to the filessystem you just created     
+  MountTargetA:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: 
+        Ref: FileSystem
+      SecurityGroups:
+        - Fn::GetAtt: MountTargetSecurityGroup.GroupId
+      SubnetId:
+        Fn::Select: [ 0, Ref: SubnetIds ]
+  MountTargetB: 
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId:
+        Ref: FileSystem
+      SecurityGroups:
+      - Fn::GetAtt: MountTargetSecurityGroup.GroupId
+      SubnetId:
+        Fn::Select: [ 1, Ref: SubnetIds ]
+#Create a Security Group to control access to the mount targets:
+  MountTargetSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: EFS emdpoint security group
+      Tags:
+        - Key: Name 
+          Value: MountTargetSecurityGroup
+      VpcId:
+        Ref: VpcId
+  #Create a security Group to access the mount target security group you created in the previous step:
+  MountTargetAccessSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: EFS emdpoint access security group
+      Tags:
+        - Key: Name
+          Value: MountTargetAccessSecurityGroup
+      VpcId:
+        Ref: VpcId
+  #Define the ingress and egress rules for the mount target security group:
+  MountTargetIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      FromPort: 2049
+      GroupId:
+        Fn::GetAtt: MountTargetSecurityGroup.GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        Fn::GetAtt: MountTargetAccessSecurityGroup.GroupId
+      ToPort: 2049
+  MountTargetEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      DestinationSecurityGroupId:
+        Fn::GetAtt: MountTargetAccessSecurityGroup.GroupId
+      FromPort: 2049
+      GroupId:
+        Fn::GetAtt: MountTargetSecurityGroup.GroupId
+      IpProtocol: tcp   
+      ToPort: 2049    
+  #Define the ingress and egress rules for the mount target access security group:
+  MountTargetAccessIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      FromPort: 22
+      GroupId: 
+        Fn::GetAtt: MountTargetAccessSecurityGroup.GroupId
+      IpProtocol: tcp
+      CidrIp: 0.0.0.0/0
+      ToPort: 22
+  MountTargetAccessEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties: 
+      DestinationSecurityGroupId:
+        Fn::GetAtt: MountTargetSecurityGroup.GroupId
+      FromPort: 2049
+      GroupId:
+        Fn::GetAtt: MountTargetAccessSecurityGroup.GroupId
+      IpProtocol: tcp
+      ToPort: 2049
