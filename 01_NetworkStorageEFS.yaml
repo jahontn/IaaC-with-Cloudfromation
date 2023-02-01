@@ -5,11 +5,11 @@ Parameters:
   VpcId:
     Description: VPC ID that contains the subnets that will access the file system
     Type: AWS::SSM::Parameter::Value<AWS::EC2::VPC::Id>
-    Default: DefaultVpc
+    Default: DefaultVpc   # This is the name of the Parameter in parameter store value is vpc id. valu will be passed through.
   SubnetIds:
     Description: Subnet IDs allowed to access the EFS file system
     Type: AWS::SSM::Parameter::Value<List<AWS::EC2::Subnet::id>>
-    Default: SubnetIds
+    Default: SubnetIds  # this is the name of the Parameter in Parameter store, values are subnet ids. values will be passed through.
 
 Resources:
   FileSystem:
